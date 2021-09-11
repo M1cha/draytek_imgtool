@@ -1,0 +1,12 @@
+[package]
+name = "draytek_imgtool"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0"
+byteorder = "1.4"
+clap = { git = "https://github.com/clap-rs/clap.git" }
+crc = "2.0"
+md5 = "0.7"
+parse_int = "0.6"
