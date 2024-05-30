@@ -1,10 +1,11 @@
 use byteorder::WriteBytesExt as _;
-use clap::Clap as _;
+use clap::Parser as _;
 use std::convert::TryInto as _;
 use std::io::Seek as _;
 use std::io::Write as _;
 
 pub const CRC_32_DRAYTEK: crc::Algorithm<u32> = crc::Algorithm {
+    width: 32,
     poly: 0x04c11db7,
     init: 0xffffffff,
     refin: true,
@@ -14,7 +15,7 @@ pub const CRC_32_DRAYTEK: crc::Algorithm<u32> = crc::Algorithm {
     residue: 0xdebb20e3,
 };
 
-#[derive(clap::Clap)]
+#[derive(clap::Parser)]
 struct Opts {
     /// Path to the LZMA-compressed kernel image
     #[clap(short, long)]

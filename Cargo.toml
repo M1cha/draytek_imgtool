@@ -6,7 +6,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 byteorder = "1.4"
-clap = { git = "https://github.com/clap-rs/clap.git" }
-crc = "2.0"
+clap = { version = "4.5", features = ["derive"] }
+crc = "3.2"
 md5 = "0.7"
 parse_int = "0.6"
