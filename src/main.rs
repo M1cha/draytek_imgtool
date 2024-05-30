@@ -16,7 +16,7 @@ pub const CRC_32_DRAYTEK: crc::Algorithm<u32> = crc::Algorithm {
 };
 
 #[derive(clap::Parser)]
-struct Opts {
+struct PackCommand {
     /// Path to the LZMA-compressed kernel image
     #[clap(short, long)]
     kernel: std::path::PathBuf,
@@ -30,6 +30,17 @@ struct Opts {
     /// kernel loading address
     #[clap(long, default_value = "0x80002000")]
     kernel_addr: String,
+}
+
+#[derive(clap::Subcommand)]
+enum Commands {
+    Pack(PackCommand),
+}
+
+#[derive(clap::Parser)]
+struct Opts {
+    #[command(subcommand)]
+    command: Commands,
 }
 
 struct Crc32DigestWriter<'a, 'b>(&'a mut crc::Digest<'b, u32>);
@@ -104,9 +115,7 @@ fn write_byte_repeat<W: std::io::Write>(
     Ok(())
 }
 
-fn main() -> anyhow::Result<()> {
-    let opts: Opts = Opts::parse();
-
+fn pack(opts: PackCommand) -> anyhow::Result<()> {
     let header_size = 0x100;
 
     let mut kernel = std::fs::File::open(&opts.kernel)?;
@@ -163,4 +172,11 @@ fn main() -> anyhow::Result<()> {
     write!(&mut out_raw, "DrayTekImageMD5\n{:x}\n", image_md5)?;
 
     Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
+    let opts: Opts = Opts::parse();
+    match opts.command {
+        Commands::Pack(opts) => pack(opts),
+    }
 }
