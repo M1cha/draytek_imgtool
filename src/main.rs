@@ -35,6 +35,19 @@ struct DecryptCommand {
 }
 
 #[derive(clap::Parser)]
+struct EncryptCommand {
+    /// Path to decrypted image
+    #[clap(short, long)]
+    input: std::path::PathBuf,
+    /// Path to encrypted image
+    #[clap(short, long)]
+    output: std::path::PathBuf,
+    /// Nonce prefix
+    #[clap(short, long)]
+    nonce_prefix: u32,
+}
+
+#[derive(clap::Parser)]
 struct PackCommand {
     /// Path to the LZMA-compressed kernel image
     #[clap(short, long)]
@@ -64,6 +77,7 @@ struct UnpackCommand {
 #[derive(clap::Subcommand)]
 enum Commands {
     Decrypt(DecryptCommand),
+    Encrypt(EncryptCommand),
     Pack(PackCommand),
     Unpack(UnpackCommand),
 }
@@ -211,6 +225,51 @@ fn decrypt(opts: DecryptCommand) -> anyhow::Result<()> {
 
     let mut plaintext_file = std::fs::File::create(&opts.output)?;
     plaintext_file.write_all(image_data)?;
+
+    Ok(())
+}
+
+fn encrypt(opts: EncryptCommand) -> anyhow::Result<()> {
+    let mut image_data = vec![];
+    let image_data = {
+        let mut image = std::fs::File::open(&opts.input)?;
+        let num_read = image.read_to_end(&mut image_data)?;
+        &mut image_data[..num_read]
+    };
+
+    let is_encrypted = u32::from_be_bytes(image_data[0x8C..0x90].try_into().unwrap());
+    let nonce_prefix = &image_data[0x90..0x94];
+    if is_encrypted != 0 || nonce_prefix != [0x00, 0x00, 0x00, 0x00] {
+        anyhow::bail!("The file is not decrypted");
+    }
+
+    let mut key = [0; 32];
+    key.iter_mut()
+        .enumerate()
+        .for_each(|(index, v)| *v = index.try_into().unwrap());
+    b"Vigor167"
+        .iter()
+        .enumerate()
+        .for_each(|(index, char)| key[index] = *char);
+    hexdump::hexdump(&key);
+
+    let nonce_prefix = opts.nonce_prefix.to_be_bytes();
+    let mut nonce = [0; 12];
+    nonce
+        .iter_mut()
+        .enumerate()
+        .for_each(|(index, v)| *v = index.try_into().unwrap());
+    nonce[..4].copy_from_slice(&nonce_prefix);
+    hexdump::hexdump(&nonce);
+
+    let mut cipher = ChaCha20::new(&key.into(), &nonce.into());
+    cipher.apply_keystream(&mut image_data[0x100..]);
+
+    image_data[0x8C] = 0x01;
+    image_data[0x90..0x94].copy_from_slice(&nonce_prefix);
+
+    let mut crypttext_file = std::fs::File::create(&opts.output)?;
+    crypttext_file.write_all(image_data)?;
 
     Ok(())
 }
@@ -404,6 +463,7 @@ fn main() -> anyhow::Result<()> {
     let opts: Opts = Opts::parse();
     match opts.command {
         Commands::Decrypt(opts) => decrypt(opts),
+        Commands::Encrypt(opts) => encrypt(opts),
         Commands::Pack(opts) => pack(opts),
         Commands::Unpack(opts) => unpack(opts),
     }
